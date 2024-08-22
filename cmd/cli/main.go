@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/notrab/sse-to-json-courier/internal/flags"
+	"github.com/notrab/sse-to-json-courier/cmd/cli/flags"
 	"github.com/notrab/sse-to-json-courier/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -42,12 +42,16 @@ func startServer() {
 	}
 
 	http.Handle("/", proxyServer)
+
+	port := fmt.Sprintf(":%s", flags.Port)
 	go func() {
-		logger.Println("Starting server on :8080")
-		log.Fatal(http.ListenAndServe(":8080", nil))
+		logger.Printf("Starting server on %s", port)
+		if err := http.ListenAndServe(port, nil); err != nil {
+			log.Fatalf("Error starting HTTP server: %v", err)
+		}
 	}()
 
-	fmt.Println("Server started successfully. Press Ctrl+C to stop.")
+	fmt.Printf("Server started successfully on port %s. Press Ctrl+C to stop.", port)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
