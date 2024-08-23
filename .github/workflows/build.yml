@@ -120,3 +120,10 @@ jobs:
               --data-binary "@sse-proxy-server-${output_name}" \
               "${{ steps.create_release.outputs.upload_url }}?name=sse-proxy-server-${output_name}"
           done
+
+      - name: List uploaded assets
+        run: |
+          echo "Uploaded assets:"
+          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "${{ steps.create_release.outputs.upload_url }}" | jq '.[].name'
