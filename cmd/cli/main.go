@@ -5,10 +5,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
 	"github.com/notrab/sse-to-json-courier/cmd/cli/flags"
+	"github.com/notrab/sse-to-json-courier/internal/config"
 	"github.com/notrab/sse-to-json-courier/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -33,36 +35,53 @@ func init() {
 }
 
 func startServer() {
-	logger := log.New(os.Stdout, "", log.LstdFlags)
-	proxyServer := server.NewProxyServer(logger)
+	cmd := exec.Command(os.Args[0])
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("SOURCE_URL=%s", flags.SourceURL),
+		fmt.Sprintf("TARGET_URL=%s", flags.TargetURL),
+		fmt.Sprintf("AUTH_TOKEN=%s", flags.AuthToken),
+		fmt.Sprintf("PORT=%s", flags.Port),
+	)
 
-	err := proxyServer.Start(flags.SourceURL, flags.TargetURL, flags.AuthToken)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Start()
 	if err != nil {
-		log.Fatalf("Error starting proxy: %v", err)
+		log.Fatalf("Error starting server: %v", err)
 	}
 
-	http.Handle("/", proxyServer)
-
-	port := fmt.Sprintf(":%s", flags.Port)
-	go func() {
-		logger.Printf("Starting server on %s", port)
-		if err := http.ListenAndServe(port, nil); err != nil {
-			log.Fatalf("Error starting HTTP server: %v", err)
-		}
-	}()
-
-	fmt.Printf("Server started successfully on port %s. Press Ctrl+C to stop.", port)
+	fmt.Printf("Server started successfully on port %s. Press Ctrl+C to stop.\n", flags.Port)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
 	fmt.Println("\nShutting down server...")
+	cmd.Process.Kill()
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	if len(os.Args) == 1 {
+		logger := log.New(os.Stdout, "", log.LstdFlags)
+		cfg, err := config.Load()
+		if err != nil {
+			logger.Fatalf("Error loading configuration: %v", err)
+		}
+
+		proxyServer := server.NewProxyServer(logger)
+		err = proxyServer.Start(cfg.SourceURL, cfg.TargetURL, cfg.AuthToken)
+		if err != nil {
+			logger.Fatalf("Error starting proxy: %v", err)
+		}
+
+		http.Handle("/", proxyServer)
+		logger.Printf("Starting server on :%s", cfg.Port)
+		log.Fatal(http.ListenAndServe(":"+cfg.Port, nil))
+	} else {
+		if err := rootCmd.Execute(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 }

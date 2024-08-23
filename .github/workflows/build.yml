@@ -1,79 +1,121 @@
-name: Build and Release
+name: Build CLI and Server
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  release:
-    types: [created]
 
 jobs:
   build:
-    name: Build and Create Artifacts
-    runs-on: ubuntu-latest
+    name: Build binaries
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        goos: [linux, windows, darwin]
-        goarch: [amd64, arm64]
-        exclude:
-          - goarch: arm64
-            goos: windows
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            output_name: linux
+          - os: macos-latest
+            output_name: darwin
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Read Go version from go.mod
+        id: go-version
+        run: |
+          GO_VERSION=$(grep -E '^go [0-9]+\.[0-9]+' go.mod | awk '{print $2}')
+          echo "GO_VERSION=${GO_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.22.1"
+          go-version: ${{ steps.go-version.outputs.GO_VERSION }}
 
       - name: Build CLI
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o sse-proxy-cli-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/cli
+          go build -o sse-proxy-cli-${{ matrix.output_name }} ./cmd/cli
         env:
-          CGO_ENABLED: 0
+          GOOS: ${{ matrix.output_name }}
+          GOARCH: amd64
 
       - name: Build Server
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o sse-proxy-server-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/server
+          go build -o sse-proxy-server-${{ matrix.output_name }} .
         env:
-          CGO_ENABLED: 0
+          GOOS: ${{ matrix.output_name }}
+          GOARCH: amd64
 
-      - name: Upload CLI Artifact
+      - name: Upload CLI artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sse-proxy-cli-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: sse-proxy-cli-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+          name: sse-proxy-cli-${{ matrix.output_name }}
+          path: sse-proxy-cli-${{ matrix.output_name }}
 
-      - name: Upload Server Artifact
+      - name: Upload Server artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sse-proxy-server-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: sse-proxy-server-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+          name: sse-proxy-server-${{ matrix.output_name }}
+          path: sse-proxy-server-${{ matrix.output_name }}
 
-  release:
-    name: Create Release
+  create-release:
     needs: build
-    if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v3
 
-      - name: Display structure of downloaded files
-        run: ls -R
-
-      - name: Zip Artifacts
-        run: |
-          for dir in sse-proxy-*; do
-            zip -r "${dir}.zip" "$dir"
-          done
-
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            *.zip
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}-${{ github.sha }}
+          release_name: Release ${{ github.ref }}-${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./sse-proxy-cli-linux/sse-proxy-cli-linux
+          asset_name: sse-proxy-cli-linux
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./sse-proxy-server-linux/sse-proxy-server-linux
+          asset_name: sse-proxy-server-linux
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./sse-proxy-cli-darwin/sse-proxy-cli-darwin
+          asset_name: sse-proxy-cli-darwin
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./sse-proxy-server-darwin/sse-proxy-server-darwin
+          asset_name: sse-proxy-server-darwin
+          asset_content_type: application/octet-stream
