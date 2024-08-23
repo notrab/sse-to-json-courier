@@ -108,7 +108,7 @@ jobs:
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Content-Type: application/gzip" \
               -H "Accept: application/vnd.github.v3+json" \
-              --data-binary "@sse-proxy-cli-${output_name}.tar.gz/sse-proxy-cli-${output_name}.tar.gz" \
+              --data-binary "@sse-proxy-cli-${output_name}.tar.gz" \
               "${{ steps.create_release.outputs.upload_url }}?name=sse-proxy-cli-${output_name}.tar.gz"
 
             # Upload Server binary
@@ -117,6 +117,6 @@ jobs:
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Content-Type: application/octet-stream" \
               -H "Accept: application/vnd.github.v3+json" \
-              --data-binary "@sse-proxy-server-${output_name}/sse-proxy-server-${output_name}" \
+              --data-binary "@sse-proxy-server-${output_name}" \
               "${{ steps.create_release.outputs.upload_url }}?name=sse-proxy-server-${output_name}"
           done
