@@ -1,0 +1,21 @@
+{
+  "name": "sse-proxy",
+  "version": "0.1.0",
+  "description": "A proxy server for Server-Sent Events",
+  "main": "npm/index.js",
+  "bin": {
+    "sse-proxy": "./npm/run.js"
+  },
+  "scripts": {
+    "postinstall": "node npm/install.js"
+  },
+  "files": [
+    "npm/run.js",
+    "npm/install.js",
+    "npm/index.js",
+    "npm/binary.js"
+  ],
+  "dependencies": {
+    "binary-install": "^1.0.1"
+  }
+}
