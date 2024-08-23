@@ -87,43 +87,26 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          release_name: Release v${{ steps.get_version.outputs.VERSION }}
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ steps.get_version.outputs.VERSION }} \
+            --title "Release v${{ steps.get_version.outputs.VERSION }}" \
+            --notes "Automated release for commit ${{ github.sha }}"
 
       - name: Upload Release Assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           for output_name in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
-            # Upload CLI tarball
-            curl -L \
-              -X POST \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Content-Type: application/gzip" \
-              -H "Accept: application/vnd.github.v3+json" \
-              --data-binary "@sse-proxy-cli-${output_name}.tar.gz" \
-              "${{ steps.create_release.outputs.upload_url }}?name=sse-proxy-cli-${output_name}.tar.gz"
-
-            # Upload Server binary
-            curl -L \
-              -X POST \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Content-Type: application/octet-stream" \
-              -H "Accept: application/vnd.github.v3+json" \
-              --data-binary "@sse-proxy-server-${output_name}" \
-              "${{ steps.create_release.outputs.upload_url }}?name=sse-proxy-server-${output_name}"
+            gh release upload v${{ steps.get_version.outputs.VERSION }} \
+              sse-proxy-cli-${output_name}.tar.gz/sse-proxy-cli-${output_name}.tar.gz \
+              sse-proxy-server-${output_name}/sse-proxy-server-${output_name}
           done
 
       - name: List uploaded assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Uploaded assets:"
-          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-               -H "Accept: application/vnd.github.v3+json" \
-               "${{ steps.create_release.outputs.upload_url }}" | jq '.[].name'
+          gh release view v${{ steps.get_version.outputs.VERSION }} --json assets --jq '.assets[].name'
