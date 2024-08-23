@@ -6,18 +6,32 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build binaries
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            output_name: linux
+            GOOS: linux
+            GOARCH: amd64
+            output_name: linux-x64
+          - os: ubuntu-latest
+            GOOS: linux
+            GOARCH: arm64
+            output_name: linux-arm64
           - os: macos-latest
-            output_name: darwin
+            GOOS: darwin
+            GOARCH: amd64
+            output_name: darwin-x64
+          - os: macos-latest
+            GOOS: darwin
+            GOARCH: arm64
+            output_name: darwin-arm64
 
     steps:
       - name: Check out code
