@@ -1,10 +1,10 @@
 {
-  "name": "sse-proxy",
-  "version": "0.1.0",
-  "description": "A proxy server for Server-Sent Events",
+  "name": "sse-to-json-proxy",
+  "version": "0.0.0-development",
+  "description": "A proxy development server for Server-Sent Events",
   "main": "npm/index.js",
   "bin": {
-    "sse-proxy": "./npm/run.js"
+    "sse-to-json-proxy": "./npm/run.js"
   },
   "scripts": {
     "postinstall": "node npm/install.js"
