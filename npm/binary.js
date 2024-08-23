@@ -10,13 +10,13 @@ function getBinary() {
     if (arch === "arm64") {
       return "sse-proxy-cli-darwin-arm64";
     }
-    return "sse-proxy-cli-darwin-x64";
+    return "sse-proxy-cli-darwin-amd64";
   }
   if (type === "Linux") {
     if (arch === "arm64") {
       return "sse-proxy-cli-linux-arm64";
     }
-    return "sse-proxy-cli-linux-x64";
+    return "sse-proxy-cli-linux-amd64";
   }
   throw new Error(`Unsupported platform: ${type} ${arch}`);
 }
