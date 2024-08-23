@@ -19,7 +19,7 @@ jobs:
           - os: ubuntu-latest
             GOOS: linux
             GOARCH: amd64
-            output_name: linux-x64
+            output_name: linux-amd64
           - os: ubuntu-latest
             GOOS: linux
             GOARCH: arm64
@@ -27,7 +27,7 @@ jobs:
           - os: macos-latest
             GOOS: darwin
             GOARCH: amd64
-            output_name: darwin-x64
+            output_name: darwin-amd64
           - os: macos-latest
             GOOS: darwin
             GOARCH: arm64
@@ -50,23 +50,20 @@ jobs:
 
       - name: Build CLI
         run: |
-          go build -o sse-proxy-cli-${{ matrix.output_name }} ./cmd/cli
-        env:
-          GOOS: ${{ matrix.output_name }}
-          GOARCH: amd64
+          GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -o sse-proxy-cli-${{ matrix.output_name }} ./cmd/cli
 
       - name: Build Server
         run: |
-          go build -o sse-proxy-server-${{ matrix.output_name }} .
-        env:
-          GOOS: ${{ matrix.output_name }}
-          GOARCH: amd64
+          GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -o sse-proxy-server-${{ matrix.output_name }} .
+
+      - name: Create tarball
+        run: tar -czvf sse-proxy-cli-${{ matrix.output_name }}.tar.gz sse-proxy-cli-${{ matrix.output_name }}
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sse-proxy-cli-${{ matrix.output_name }}
-          path: sse-proxy-cli-${{ matrix.output_name }}
+          name: sse-proxy-cli-${{ matrix.output_name }}.tar.gz
+          path: sse-proxy-cli-${{ matrix.output_name }}.tar.gz
 
       - name: Upload Server artifact
         uses: actions/upload-artifact@v3
@@ -83,53 +80,43 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v3
 
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}-${{ github.sha }}
-          release_name: Release ${{ github.ref }}-${{ github.sha }}
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          release_name: Release v${{ steps.get_version.outputs.VERSION }}
           draft: false
           prerelease: false
 
       - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sse-proxy-cli-linux/sse-proxy-cli-linux
-          asset_name: sse-proxy-cli-linux
-          asset_content_type: application/octet-stream
+        run: |
+          for output_name in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            # Upload CLI tarball
+            curl -L \
+              -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Content-Type: application/gzip" \
+              -H "Accept: application/vnd.github.v3+json" \
+              --data-binary "@sse-proxy-cli-${output_name}.tar.gz/sse-proxy-cli-${output_name}.tar.gz" \
+              "${{ steps.create_release.outputs.upload_url }}?name=sse-proxy-cli-${output_name}.tar.gz"
 
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sse-proxy-server-linux/sse-proxy-server-linux
-          asset_name: sse-proxy-server-linux
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sse-proxy-cli-darwin/sse-proxy-cli-darwin
-          asset_name: sse-proxy-cli-darwin
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sse-proxy-server-darwin/sse-proxy-server-darwin
-          asset_name: sse-proxy-server-darwin
-          asset_content_type: application/octet-stream
+            # Upload Server binary
+            curl -L \
+              -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              -H "Accept: application/vnd.github.v3+json" \
+              --data-binary "@sse-proxy-server-${output_name}/sse-proxy-server-${output_name}" \
+              "${{ steps.create_release.outputs.upload_url }}?name=sse-proxy-server-${output_name}"
+          done
